@@ -1,0 +1,136 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Data;
+using System.Text;
+
+namespace Web
+{
+    public partial class Index : PageAuthBase
+    {
+        protected override bool DisabledCache
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+        protected override bool NeedRedirect
+        {
+            get
+            {
+                return false;
+            }
+        }
+        protected override bool OnPageLoadAuth()
+        {
+            if (!this.Page.IsPostBack)
+            {
+                try
+                {
+                    System.Reflection.Assembly verinfo = System.Reflection.Assembly.GetExecutingAssembly();
+                    litVersion.Text = string.Format("本机地址：{2}&nbsp;&nbsp;版本信息：v{0} build {1}",
+                        verinfo.GetName().Version,
+                        System.IO.File.GetLastWriteTime(verinfo.Location),this.Request.UserHostAddress);
+                }
+                catch (Exception)
+                { //CatchException(Common.CatchTypes.None, null, "版本信息", ex); 
+                }
+                InitMenuNew();
+                Help.AttachmentHelp.RefreshPath(this);
+            }
+            return true;
+        }
+
+        private void InitMenu()
+        {
+            try
+            {
+                BLL.SysMenuBLL smb = new BLL.SysMenuBLL(LoginUser);
+                DataTable dt = smb.GetUserAllMenus();
+                StringBuilder sb = new StringBuilder();
+                string toroot = PreFixToRoot;
+                foreach (DataRow dr1 in dt.Select("ParentID='0'", "OrderID"))
+                {
+                    sb.AppendFormat("<div class='m_menu' icon=\"{0}\" title=\"{1}\" selected=\"false\" style=\"overflow: auto;\" >", dr1["ImageUrl"], dr1["NodeName"]);
+                    foreach (DataRow dr2 in dt.Select(string.Format("ParentID='{0}'", dr1["NodeID"]), "OrderID"))
+                    {
+                        sb.AppendFormat("<img src=\"{0}{1}\" />", toroot, dr2["ImageUrl"]);
+                        sb.AppendFormat("<a href=\"#\"  onclick=\"addmenu('{0}','{1}{2}')\">{0}</a><br>", dr2["NodeName"], ProjectUtil.Common.StringUtil.ToBool(dr2["IsOutLinker"], false) ? toroot : "", dr2["Url"]);
+                    }
+                    sb.Append("</div>");
+                }
+                //menu.Text = sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                CatchException(Common.CatchTypes.Alert, null, "菜单初始化失败", ex);
+            }
+        }
+        private void InitMenuNew()
+        {
+            try
+            {
+                BLL.SysMenuBLL smb = new BLL.SysMenuBLL(LoginUser);
+                DataTable dt = smb.GetUserAllMenus();
+                StringBuilder sb = new StringBuilder();
+                string toroot = PreFixToRoot;
+                bool isfirst0 = true;
+                foreach (DataRow dr1 in dt.Select("ParentID='0'", "OrderID"))
+                {
+                    if (isfirst0) { isfirst0 = false; }
+                    else { sb.Append(","); }
+                    sb.Append("{");
+                    sb.AppendFormat(@"
+""menuid"": ""{2}"",
+""icon"": ""{0}"",
+""menuname"": ""{1}"",
+""menus"": [", dr1["ImageUrl"], dr1["NodeName"], dr1["NodeID"]); bool isfirst1 = true;
+                    foreach (DataRow dr2 in dt.Select(string.Format("ParentID='{0}'", dr1["NodeID"]), "OrderID"))
+                    {
+                        if (isfirst1) { isfirst1 = false; }
+                        else { sb.Append(","); }
+                        sb.Append("{");
+                        sb.AppendFormat(@"
+""menuid"": ""{1}"",
+""icon"": ""Icon-Node"",
+""menuname"": ""{0}"",
+""url"": ""{2}{3}"",
+""child"": [", dr2["NodeName"], dr2["NodeID"], ProjectUtil.Common.StringUtil.ToBool(dr2["IsOutLinker"], false) ? toroot : "", dr2["Url"]);
+                        bool isfirst2 = true;
+                        foreach (DataRow dr3 in dt.Select(string.Format("ParentID='{0}'", dr2["NodeID"]), "OrderID"))
+                        {
+                            if (isfirst2) {isfirst2 = false; }
+                            else {  sb.Append(","); }
+                            sb.Append("{");
+                            sb.AppendFormat(@"
+""menuid"": ""{1}"",
+""icon"": ""Icon-Node-ChildNode"",
+""menuname"": ""{0}"",
+""url"": ""{2}{3}""", dr3["NodeName"], dr3["NodeID"], ProjectUtil.Common.StringUtil.ToBool(dr3["IsOutLinker"], false) ? toroot : "", dr3["Url"]); sb.Append("}");
+                        }
+                        sb.Append("]");
+                        sb.Append("}");
+                    }
+                    sb.Append("]");
+                    sb.Append("}");
+                    
+                }
+                OutputMenu = sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                CatchException(Common.CatchTypes.Alert, null, "菜单初始化失败", ex);
+            }
+        }
+        public string OutputMenu
+        {
+            get { return ProjectUtil.Common. StringUtil.ToString(ViewState["OutputMenu"]); }
+            set { ViewState["OutputMenu"] = value; }
+        }
+    }
+}
